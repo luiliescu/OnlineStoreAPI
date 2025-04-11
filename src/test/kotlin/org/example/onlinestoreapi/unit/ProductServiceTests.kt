@@ -1,4 +1,4 @@
-package org.example.onlinestoreapi
+package org.example.onlinestoreapi.unit
 
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -37,13 +37,15 @@ class ProductServiceTests {
 
         every { productRepository.save(any(Product::class)) } answers {
             val product: Product = firstArg<Product>()
+            productsList.removeAll { it.id == product.id }
             productsList.add(product)
             product
         }
 
         every { productRepository.findById(any(UUID::class)) } answers  {
             val uuid: UUID = firstArg<UUID>()
-            Optional.of(productsList.first { it.id == uuid })
+            val product = productsList.find { it.id == uuid }
+            Optional.ofNullable(product)
         }
 
         every { productRepository.deleteById(any(UUID::class)) } answers {
@@ -79,6 +81,11 @@ class ProductServiceTests {
     }
 
     @Test
+    fun `get product by id should return null if the product does not exist`() {
+        assertEquals(null, productService.getProductById(UUID.randomUUID()))
+    }
+
+    @Test
     fun `delete product by id should remove the product from db`() {
         val uuid = UUID.randomUUID()
         val product = Product(uuid, "name1", ProductCategory.NONE, LocalDate.now(), 10.0)
@@ -88,6 +95,28 @@ class ProductServiceTests {
         assertEquals(initialSize, productsList.size)
         productService.deleteProductById(uuid)
         assertTrue(productsList.isEmpty())
+    }
+
+    @Test
+    fun `update product should update existing product`() {
+        val uuid = UUID.randomUUID()
+        val expectedProduct = Product(uuid, "name1", ProductCategory.NONE, LocalDate.now(), 10.0)
+
+        productService.addProduct(expectedProduct)
+        val updatedProduct = expectedProduct.copy(name = "cheese", category = ProductCategory.CHEESE, expirationDate = LocalDate.now(), price = 20.0)
+        productService.updateProduct(uuid, updatedProduct)
+        assertEquals(updatedProduct, productService.getProductById(uuid))
+    }
+
+    @Test
+    fun `update product should not update if product does not exist`() {
+        val uuid = UUID.randomUUID()
+        val expectedProduct = Product(uuid, "name1", ProductCategory.NONE, LocalDate.now(), 10.0)
+
+        productService.addProduct(expectedProduct)
+        val updatedProduct = expectedProduct.copy(name = "cheese", category = ProductCategory.CHEESE, expirationDate = LocalDate.now(), price = 20.0)
+        productService.updateProduct(UUID.randomUUID(), updatedProduct)
+        assertEquals(expectedProduct, productService.getProductById(uuid))
     }
 
 }
